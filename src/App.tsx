@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 // ==========================================
-// HOT TAKES DATA & TYPES
+// HOT TAKE DATA & TYPES
 // ==========================================
 interface HotTakeItem {
   id: string;
@@ -63,8 +63,8 @@ interface FaqItem {
 
 const FAQ_DATA: FaqItem[] = [
   {
-    question: "What makes Hot Takes different from standard dating apps?",
-    answer: "Hot Takes brings real chemistry back to dating by cutting out the swiping fatigue and weeks of dry texting. Instead of superficial profile scrolls, you share your controversial, funny, or passionate Hot Take and join our live speed matchmaking queue. When a match is found, you connect on a private 3-minute video date to talk, debate, and experience real chemistry in real-time."
+    question: "What makes Hot Take different from standard dating apps?",
+    answer: "Hot Take brings real chemistry back to dating by cutting out the swiping fatigue and weeks of dry texting. Instead of superficial profile scrolls, you share your controversial, funny, or passionate Hot Take and join our live speed matchmaking queue. When a match is found, you connect on a private 3-minute video date to talk, debate, and experience real chemistry in real-time."
   },
   {
     question: "Is my privacy and video feed secure?",
@@ -72,7 +72,7 @@ const FAQ_DATA: FaqItem[] = [
   },
   {
     question: "Do I need to enable my camera and microphone?",
-    answer: "Yes, camera and microphone access is required to use Hot Takes. Apple App Store guidelines and our matchmaking system require active media capture so you and your match can see and hear each other. We prompt you clearly with a descriptive sheet before requesting these permissions from iOS."
+    answer: "Yes, camera and microphone access is required to use Hot Take. Apple App Store guidelines and our matchmaking system require active media capture so you and your match can see and hear each other. We prompt you clearly with a descriptive sheet before requesting these permissions from iOS."
   },
   {
     question: "How do I match and continue chatting after a date?",
@@ -146,8 +146,8 @@ function App() {
       <header className="nav-bar">
         <div className="container nav-container">
           <a href="#home" onClick={(e) => { e.preventDefault(); setCurrentView('home'); }} className="logo-link">
-            <span className="logo-icon">🔥</span>
-            <span className="logo-text">Hot Takes</span>
+            <img className="logo-icon" src="/speed-dating.svg" alt="Hot Take logo" />
+            <span className="logo-text">Hot Take</span>
           </a>
           <nav className="nav-links">
             <a 
@@ -191,7 +191,7 @@ function App() {
               <div className="container hero-grid">
                 <div className="hero-content">
                   <div className="hero-announcement">
-                    <Flame size={16} /> Now Available in App Store Connect TestFlight
+                    <Heart size={16} /> Cupid-approved matchmaking is live on TestFlight
                   </div>
                   <h1 className="hero-title">
                     Skip the swiping.<br />
@@ -233,8 +233,8 @@ function App() {
                     <div className="phone-notch"></div>
                     <div className="phone-screen">
                       <div className="mock-app-header">
-                        <span className="logo-icon">🔥</span>
-                        <span className="mock-app-title gradient-text">Hot Takes</span>
+                        <img className="logo-icon" src="/speed-dating.svg" alt="Hot Take logo" />
+                        <span className="mock-app-title gradient-text">Hot Take</span>
                         <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>1.0 (3)</span>
                       </div>
                       
@@ -264,7 +264,7 @@ function App() {
               <div className="container">
                 <div className="section-header">
                   <span className="section-label">Interactive Experience</span>
-                  <h2 className="section-title">Are your hot takes actually hot?</h2>
+                  <h2 className="section-title">Is your hot take actually hot?</h2>
                   <p>Cast your vote on the community's favorite controversial opinions and see how you match up against the rest of the world.</p>
                 </div>
 
@@ -302,14 +302,14 @@ function App() {
                             className="results-bar-hot" 
                             style={{ width: `${currentPercentages.hot}%` }}
                           >
-                            🔥 {currentPercentages.hot}% Hot
+                            💘 {currentPercentages.hot}% Hot
                           </div>
                           <div className="results-bar-cold">
                             {currentPercentages.cold}% Cold ❄️
                           </div>
                         </div>
                         <p className="results-explanation">
-                          You voted <strong>{userVote === 'hot' ? 'Hot (Agree)' : 'Cold (Disagree)'}</strong>! On Hot Takes, we use opinions like this to match you live on video.
+                          You voted <strong>{userVote === 'hot' ? 'Hot (Agree)' : 'Cold (Disagree)'}</strong>! On Hot Take, we use opinions like this to match you live on video.
                         </p>
                         <button onClick={handleResetVote} className="btn-reset-preview">
                           <RefreshCw size={12} style={{ marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} /> Change Vote
@@ -432,7 +432,7 @@ function App() {
                 <div className="legal-block">
                   <h2>1. Introduction</h2>
                   <p>
-                    Welcome to Hot Takes, operated by Monarch Labs Inc. (\"we,\" \"our,\" or \"us\"). We value your privacy and are committed to protecting your personal data. This Privacy Policy outlines how we collect, use, store, and share information when you use the Hot Takes mobile application and our website hottakedate.com.
+                    Welcome to Hot Take, operated by Monarch Labs Inc. (\"we,\" \"our,\" or \"us\"). We value your privacy and are committed to protecting your personal data. This Privacy Policy outlines how we collect, use, store, and share information when you use the Hot Take mobile application and our website hottakedate.com.
                   </p>
                 </div>
 
@@ -452,7 +452,7 @@ function App() {
                   <p>We use the collected information for the following administrative purposes:</p>
                   <ul>
                     <li>To authenticate your identity and keep your profile secure.</li>
-                    <li>To run matchmaking algorithms matching you on live speed dates based on your Hot Takes.</li>
+                    <li>To run matchmaking algorithms matching you on live speed dates based on your Hot Take.</li>
                     <li>To establish live real-time video/audio connections utilizing encrypted channels (LiveKit Cloud).</li>
                     <li>To maintain account security and offer user support.</li>
                   </ul>
@@ -499,8 +499,8 @@ function App() {
           <div className="footer-grid">
             <div className="footer-brand">
               <div className="footer-logo">
-                <span className="logo-icon">🔥</span>
-                <span className="logo-text">Hot Takes</span>
+                <img className="logo-icon" src="/speed-dating.svg" alt="Hot Take logo" />
+                <span className="logo-text">Hot Take</span>
               </div>
               <p className="footer-motto">
                 Skip the swiping, embrace the chemistry. Live 3-minute speed dating for genuine human connection.

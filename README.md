@@ -1,6 +1,6 @@
-# Hot Takes Website
+# Hot Take Website
 
-Marketing website for **Hot Takes**, a live speed-dating app focused on real-time chemistry instead of swipe-based matching.
+Marketing website for **Hot Take**, a live speed-dating app focused on real-time chemistry instead of swipe-based matching.
 
 Built with React, TypeScript, and Vite.
 
