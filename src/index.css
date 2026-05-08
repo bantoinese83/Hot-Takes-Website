@@ -48,6 +48,7 @@
   /* Transitions */
   --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --focus-ring: 0 0 0 3px rgba(255, 76, 43, 0.35);
 }
 
 /* ==========================================
@@ -74,6 +75,7 @@ body {
   background-attachment: fixed;
   font-size: 16px;
   line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 #root {
@@ -95,6 +97,18 @@ a {
   color: inherit;
   text-decoration: none;
   transition: var(--transition-smooth);
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: 12px;
 }
 
 /* Scrollbar Styling */
@@ -236,7 +250,7 @@ a {
 
 /* ─── NAVIGATION ─── */
 .nav-bar {
-  padding: 20px 0;
+  padding: 16px 0;
   position: sticky;
   top: 0;
   z-index: 1000;
@@ -275,6 +289,8 @@ a {
   display: flex;
   align-items: center;
   gap: 32px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .nav-item {
@@ -294,7 +310,7 @@ a {
 
 /* ─── HERO SECTION ─── */
 .hero {
-  padding: 100px 0 80px;
+  padding: 88px 0 72px;
   position: relative;
   overflow: hidden;
 }
@@ -345,7 +361,7 @@ a {
 }
 
 .hero-description {
-  font-size: 20px;
+  font-size: 19px;
   color: var(--text-secondary);
   margin-bottom: 36px;
   max-width: 640px;
@@ -616,6 +632,7 @@ a {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  gap: 8px;
 }
 
 .previewer-category {
@@ -640,6 +657,7 @@ a {
   display: flex;
   justify-content: center;
   gap: 20px;
+  flex-wrap: wrap;
 }
 
 .previewer-vote-btn {
@@ -845,6 +863,7 @@ a {
   font-family: var(--font-heading);
   font-weight: 600;
   font-size: 18px;
+  gap: 16px;
 }
 
 .faq-chevron {
@@ -993,6 +1012,97 @@ a {
 
 .footer-link:hover {
   color: var(--text-primary);
+}
+
+/* Responsive polish */
+@media (max-width: 968px) {
+  .nav-links {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 18px;
+  }
+
+  .nav-bar {
+    padding: 12px 0;
+  }
+
+  .nav-container {
+    align-items: flex-start;
+    gap: 12px;
+    flex-direction: column;
+  }
+
+  .nav-links {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 14px;
+  }
+
+  .hero {
+    padding: 68px 0 56px;
+  }
+
+  .section-title {
+    font-size: 32px;
+  }
+
+  .previewer-card,
+  .feature-card,
+  .legal-card {
+    padding: 28px 22px;
+  }
+
+  .previewer-hottake {
+    font-size: 22px;
+    margin-bottom: 24px;
+  }
+
+  .faq-trigger {
+    padding: 18px;
+    font-size: 16px;
+  }
+
+  .faq-content {
+    padding: 0 18px 18px;
+  }
+
+  .legal-title {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .logo-text {
+    font-size: 20px;
+  }
+
+  .previewer-vote-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .previewer-actions {
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  .glass-card:hover,
+  .feature-card:hover,
+  .btn-primary:hover,
+  .btn-secondary:hover {
+    transform: none !important;
+  }
 }
 
 .footer-bottom {
