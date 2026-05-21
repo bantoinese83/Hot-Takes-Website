@@ -1266,6 +1266,22 @@
 }
 
 /* ─── Intel team (Ollama) ─── */
+.intel-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.intel-memory-hint {
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
+.intel-brief-progress {
+  border-color: rgba(255, 84, 78, 0.35);
+}
+
 .intel-status {
   display: flex;
   align-items: flex-start;

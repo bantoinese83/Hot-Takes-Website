@@ -1,52 +1,59 @@
-# Admin Intel Team (Ollama)
+# Admin Intel Team
 
-Local AI agents in **`/admin/intel`** that analyze live Supabase ops data on your Mac. Data never leaves your machine except to Ollama on `localhost`.
+AI agents on **`/admin/intel`** analyze live Supabase ops data.
 
-## Setup (24GB M4 Mac mini)
+## Providers (automatic)
 
-1. Install [Ollama](https://ollama.com) and keep it running.
-2. Pull models:
+| Where | Provider | Model |
+|-------|----------|--------|
+| **Local** `npm run dev` + Ollama running | Ollama on your Mac | Per-agent (team brief uses `llama3.2:3b`) |
+| **Production** `hottakdate.com/admin/intel` | Gemini via Edge Function | `gemini-3.5-flash` (default), `thinking: low` |
 
-   ```bash
-   cd hottakedate-website
-   npm run ollama:setup
-   ```
+Priority: if Ollama is reachable in dev, use Ollama; otherwise use Gemini.
 
-   | Model | Role | ~VRAM |
-   |-------|------|-------|
-   | `llama3.2:3b` | Fast triage (moderation, queue) | ~2 GB |
-   | `llama3.1:8b` | Daily briefs, growth, geo, community | ~5 GB |
-   | `qwen2.5:14b` | Deep ops analysis | ~9 GB Q4 |
+## Setup — local Ollama
 
-3. Configure admin Supabase env in `.env.local` (same as dashboard).
-4. Run the site:
-
-   ```bash
-   npm run dev
-   ```
-
-5. Open **http://localhost:5173/admin/intel**
+```bash
+cd hottakedate-website
+npm run ollama:setup   # llama3.2:3b, llama3.1:8b, qwen2.5:14b
+npm run dev
+# http://localhost:5173/admin/intel
+```
 
 Vite proxies `/ollama` → `http://127.0.0.1:11434`.
 
+## Setup — remote Gemini
+
+1. [Google AI Studio](https://aistudio.google.com/apikey) → create API key (free tier eligible models).
+
+2. Deploy edge function (from dating-app repo):
+
+   ```bash
+   cd hot-takes-dating-app
+   supabase secrets set GEMINI_API_KEY=your_key_here
+   # Optional cheaper model:
+   # supabase secrets set GEMINI_INTEL_MODEL=gemini-2.5-flash-lite
+   supabase functions deploy admin-intel
+   ```
+
+3. Open **`https://hottakdate.com/admin/intel`** — status should show **Active: Gemini (cloud)**.
+
+Uses stable **`generateContent`** API (not Interactions beta). Secrets stay on Supabase; the browser never sees `GEMINI_API_KEY`.
+
 ## Agents
 
-| Codename | Focus | Data loaded |
-|----------|-------|-------------|
-| **ORCHESTRATOR** | Executive summary | Full snapshot |
-| **PULSE** | Funnel, waits, dates | Analytics hub |
-| **SHIELD** | Report triage | Open moderation |
-| **ROCKET** | Waitlists, growth | Analytics + growth |
-| **MAP** | Geo density | Geography snapshot |
-| **RADAR** | Live queue | Queue snapshot |
-| **SPARK** | Community Takes | Prompts list |
+| Codename | Focus |
+|----------|--------|
+| ORCHESTRATOR | Executive summary |
+| PULSE | Funnel, waits, dates |
+| SHIELD | Moderation triage |
+| ROCKET | Waitlists / growth |
+| MAP | Geography |
+| RADAR | Live queue |
+| SPARK | Community prompts |
 
-**Run all agents** chains specialists, then stores a combined brief (also in `localStorage` key `ht_intel_last_brief`).
+**Run team brief** — all agents sequentially; Ollama uses only `llama3.2:3b` + unload between steps to avoid RAM spikes on 24GB Macs.
 
-## Production note
+## iOS matching
 
-Deployed static admin on Vercel **cannot** reach your Mac’s Ollama. Use Intel only locally, or add a private tunnel/API later.
-
-## iOS matching embeddings
-
-Production matching still uses OpenAI `text-embedding-3-small` via `generate-embedding`. Ollama is **not** wired into matching unless you deliberately migrate dimensions.
+Production matching still uses OpenAI embeddings (`generate-embedding`). Intel does not change matching vectors.

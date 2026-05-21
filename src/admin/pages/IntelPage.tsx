@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Brain, Play, Square, Zap } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Brain, Cloud, HardDrive, Play, Square, Zap } from 'lucide-react';
 import { AdminPageShell } from '../components/AdminPageShell';
 import { AdminErrorBanner } from '../components/AdminErrorBanner';
-import { loadIntelContext } from '../lib/intelContext';
 import { INTEL_AGENTS, type IntelAgentId } from '../lib/intelAgents';
 import { useIntelAgent } from '../hooks/useIntelAgent';
-import { ollamaChat, ollamaHealth, pickModel, type OllamaModel } from '../lib/ollamaClient';
+import { runLightTeamBrief } from '../lib/runTeamBrief';
+import { resolveIntelRuntime, type IntelRuntime } from '../lib/intelProvider';
+import { pickBatchModel } from '../lib/intelLlm';
+import { ollamaHealth, type OllamaModel } from '../lib/ollamaClient';
 import '../admin.css';
 
 function formatModelSize(bytes?: number): string {
@@ -16,18 +18,18 @@ function formatModelSize(bytes?: number): string {
 
 function AgentPanel({
   agentId,
-  availableModels,
+  runtime,
   selected,
   onSelect,
 }: {
   agentId: IntelAgentId;
-  availableModels: string[];
+  runtime: IntelRuntime;
   selected: boolean;
   onSelect: () => void;
 }) {
-  const { agent, state, output, error, contextPreview, run, cancel } = useIntelAgent(
+  const { agent, state, output, error, contextPreview, displayModel, run, cancel } = useIntelAgent(
     agentId,
-    availableModels,
+    runtime,
   );
   const [followUp, setFollowUp] = useState('');
   const Icon = agent.icon;
@@ -44,7 +46,7 @@ function AgentPanel({
           <span className="intel-agent-name">{agent.name}</span>
           <span className="intel-agent-role">{agent.role}</span>
         </span>
-        <span className="intel-agent-model">{agent.model}</span>
+        <span className="intel-agent-model">{displayModel}</span>
       </button>
 
       {selected ? (
@@ -53,7 +55,7 @@ function AgentPanel({
             <button
               type="button"
               className="admin-btn admin-btn--primary"
-              disabled={busy || !availableModels.length}
+              disabled={busy || !runtime.canRun}
               onClick={() => void run()}
             >
               <Play size={14} aria-hidden /> Run brief
@@ -80,7 +82,7 @@ function AgentPanel({
             <button
               type="button"
               className="admin-btn admin-btn--secondary"
-              disabled={busy}
+              disabled={busy || !runtime.canRun}
               onClick={() => void run(followUp)}
             >
               Send follow-up
@@ -113,110 +115,127 @@ function AgentPanel({
 }
 
 export function IntelPage() {
-  const [health, setHealth] = useState<{ ok: boolean; models: OllamaModel[]; error?: string }>({
-    ok: false,
-    models: [],
-  });
+  const [runtime, setRuntime] = useState<IntelRuntime | null>(null);
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
+  const [loadingRuntime, setLoadingRuntime] = useState(true);
   const [selectedId, setSelectedId] = useState<IntelAgentId>('intel-director');
   const [briefRunning, setBriefRunning] = useState(false);
   const [briefLog, setBriefLog] = useState<string[]>([]);
   const [fullBrief, setFullBrief] = useState<string | null>(() =>
     typeof localStorage !== 'undefined' ? localStorage.getItem('ht_intel_last_brief') : null,
   );
+  const briefAbortRef = useRef<AbortController | null>(null);
 
-  const refreshHealth = useCallback(async () => {
-    setHealth(await ollamaHealth());
+  const refreshRuntime = useCallback(async () => {
+    setLoadingRuntime(true);
+    const [resolved, ollama] = await Promise.all([resolveIntelRuntime(), ollamaHealth()]);
+    setRuntime(resolved);
+    setOllamaModels(ollama.models);
+    setLoadingRuntime(false);
   }, []);
 
   useEffect(() => {
-    void refreshHealth();
-    const id = window.setInterval(() => void refreshHealth(), 20_000);
+    void refreshRuntime();
+    const id = window.setInterval(() => void refreshRuntime(), 30_000);
     return () => window.clearInterval(id);
-  }, [refreshHealth]);
+  }, [refreshRuntime]);
 
-  const modelNames = health.models.map((m) => m.name);
+  const cancelBrief = () => {
+    briefAbortRef.current?.abort();
+    briefAbortRef.current = null;
+    setBriefRunning(false);
+    setBriefLog(['Cancelled']);
+  };
 
   const runFullBrief = async () => {
-    if (!modelNames.length) return;
+    if (!runtime?.canRun) return;
+    briefAbortRef.current?.abort();
+    const ac = new AbortController();
+    briefAbortRef.current = ac;
+
+    const modelLabel =
+      runtime.provider === 'ollama'
+        ? pickBatchModel(runtime.ollamaModels)
+        : runtime.geminiModel;
+
     setBriefRunning(true);
-    setBriefLog([]);
-    const order: IntelAgentId[] = [
-      'ops-commander',
-      'queue-watcher',
-      'moderation-analyst',
-      'growth-scout',
-      'geo-strategist',
-      'community-editor',
-      'intel-director',
-    ];
-    const sections: string[] = [];
+    setBriefLog([`Team brief · ${runtime.label} · ${modelLabel}`]);
 
-    for (const id of order) {
-      const agent = INTEL_AGENTS.find((a) => a.id === id)!;
-      setBriefLog((prev) => [...prev, `Running ${agent.codename}…`]);
-      try {
-        const ctx = await loadIntelContext(agent.contextScope);
-        const text = await ollamaChat({
-          model: pickModel(agent.model, modelNames),
-          messages: [
-            { role: 'system', content: agent.systemPrompt },
-            { role: 'user', content: `ADMIN DATA:\n${ctx}\n\n${agent.starterPrompt}` },
-          ],
-        });
-        sections.push(`## ${agent.name} (${agent.codename})\n\n${text}`);
-      } catch (e) {
-        sections.push(`## ${agent.name}\n\nError: ${e instanceof Error ? e.message : 'failed'}`);
-      }
+    try {
+      const combined = await runLightTeamBrief({
+        provider: runtime.provider,
+        ollamaModels: runtime.ollamaModels,
+        signal: ac.signal,
+        onProgress: (p) => setBriefLog([p.message]),
+      });
+      setFullBrief(combined);
+      localStorage.setItem('ht_intel_last_brief', combined);
+      setSelectedId('intel-director');
+      setBriefLog([]);
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      setBriefLog([e instanceof Error ? e.message : 'Brief failed']);
+    } finally {
+      briefAbortRef.current = null;
+      setBriefRunning(false);
     }
-
-    setBriefLog([]);
-    const combined = sections.join('\n\n---\n\n');
-    setFullBrief(combined);
-    localStorage.setItem('ht_intel_last_brief', combined);
-    setSelectedId('intel-director');
-    setBriefRunning(false);
   };
+
+  const ProviderIcon = runtime?.provider === 'ollama' ? HardDrive : Cloud;
 
   return (
     <AdminPageShell
       title="Intel team"
-      subtitle="Local Ollama agents on your Mac — analyze live Supabase ops data"
+      subtitle="Ollama on your Mac when developing · Gemini 3.5 Flash on the live admin"
       actions={
-        <button
-          type="button"
-          className="admin-btn admin-btn--primary"
-          disabled={!health.ok || briefRunning}
-          onClick={() => void runFullBrief()}
-        >
-          <Zap size={14} aria-hidden /> Run all agents
-        </button>
+        <div className="intel-page-actions">
+          <button
+            type="button"
+            className="admin-btn admin-btn--primary"
+            disabled={!runtime?.canRun || briefRunning || loadingRuntime}
+            onClick={() => void runFullBrief()}
+          >
+            <Zap size={14} aria-hidden /> Run team brief
+          </button>
+          {briefRunning ? (
+            <button type="button" className="admin-btn admin-btn--ghost" onClick={cancelBrief}>
+              <Square size={14} aria-hidden /> Stop
+            </button>
+          ) : null}
+        </div>
       }
     >
-      <div className={`intel-status ${health.ok ? 'intel-status--ok' : 'intel-status--err'}`}>
-        <Brain size={20} aria-hidden />
+      <div
+        className={`intel-status ${runtime?.canRun ? 'intel-status--ok' : 'intel-status--err'}`}
+      >
+        {runtime ? <ProviderIcon size={20} aria-hidden /> : <Brain size={20} aria-hidden />}
         <div>
-          <strong>{health.ok ? 'Ollama connected' : 'Ollama offline'}</strong>
-          <p>
-            {health.ok
-              ? `${health.models.length} model(s) — scout llama3.2:3b · workhorse llama3.1:8b · analyst qwen2.5:14b`
-              : health.error ?? 'Start Ollama app, then run ./scripts/ollama-setup.sh'}
-          </p>
+          <strong>
+            {loadingRuntime
+              ? 'Checking providers…'
+              : runtime?.canRun
+                ? `Active: ${runtime.label}`
+                : 'No provider available'}
+          </strong>
+          <p>{runtime?.detail ?? 'Connect Ollama locally or set GEMINI_API_KEY on Supabase.'}</p>
         </div>
-        <button type="button" className="admin-btn admin-btn--ghost" onClick={() => void refreshHealth()}>
+        <button
+          type="button"
+          className="admin-btn admin-btn--ghost"
+          onClick={() => void refreshRuntime()}
+          disabled={loadingRuntime}
+        >
           Refresh
         </button>
       </div>
 
-      {!health.ok ? (
-        <AdminErrorBanner
-          message="Intel requires Ollama on this machine. Vite proxies /ollama → localhost:11434 during npm run dev."
-          degraded
-        />
+      {!loadingRuntime && runtime && !runtime.canRun ? (
+        <AdminErrorBanner message={runtime.detail} degraded />
       ) : null}
 
-      {health.models.length > 0 ? (
+      {runtime?.provider === 'ollama' && ollamaModels.length > 0 ? (
         <ul className="intel-model-list">
-          {health.models.map((m) => (
+          {ollamaModels.map((m) => (
             <li key={m.name}>
               <code>{m.name}</code>
               {m.size ? <span>{formatModelSize(m.size)}</span> : null}
@@ -225,8 +244,23 @@ export function IntelPage() {
         </ul>
       ) : null}
 
+      {runtime?.provider === 'gemini' && runtime.geminiConfigured ? (
+        <p className="admin-hint-card">
+          Cloud model: <code>{runtime.geminiModel}</code> · generateContent · thinking{' '}
+          <code>low</code> (cost-efficient). Override via Supabase secret{' '}
+          <code>GEMINI_INTEL_MODEL</code> (e.g. <code>gemini-2.5-flash-lite</code>).
+        </p>
+      ) : null}
+
+      {runtime?.provider === 'ollama' ? (
+        <p className="admin-hint-card intel-memory-hint" role="note">
+          <strong>Memory:</strong> Team brief uses only <code>llama3.2:3b</code>. On production URL we
+          automatically use Gemini instead.
+        </p>
+      ) : null}
+
       {briefRunning && briefLog.length ? (
-        <p className="admin-hint-card">{briefLog[briefLog.length - 1]}</p>
+        <p className="admin-hint-card intel-brief-progress">{briefLog[briefLog.length - 1]}</p>
       ) : null}
 
       {fullBrief ? (
@@ -236,17 +270,19 @@ export function IntelPage() {
         </details>
       ) : null}
 
-      <div className="intel-agent-grid">
-        {INTEL_AGENTS.map((a) => (
-          <AgentPanel
-            key={a.id}
-            agentId={a.id}
-            availableModels={modelNames}
-            selected={selectedId === a.id}
-            onSelect={() => setSelectedId(a.id)}
-          />
-        ))}
-      </div>
+      {runtime ? (
+        <div className="intel-agent-grid">
+          {INTEL_AGENTS.map((a) => (
+            <AgentPanel
+              key={a.id}
+              agentId={a.id}
+              runtime={runtime}
+              selected={selectedId === a.id}
+              onSelect={() => setSelectedId(a.id)}
+            />
+          ))}
+        </div>
+      ) : null}
     </AdminPageShell>
   );
 }

@@ -1,17 +1,30 @@
 import { useCallback, useRef, useState } from 'react';
 import { loadIntelContext } from '../lib/intelContext';
 import { INTEL_AGENT_MAP, type IntelAgentId } from '../lib/intelAgents';
-import { ollamaChat, pickModel, type ChatMessage } from '../lib/ollamaClient';
+import { intelChat, type ChatMessage } from '../lib/intelLlm';
+import type { IntelProviderId } from '../lib/intelProvider';
+import { providerModelLabel } from '../lib/intelProvider';
 
 export type IntelRunState = 'idle' | 'loading-data' | 'streaming' | 'done' | 'error';
 
-export function useIntelAgent(agentId: IntelAgentId, availableModels: string[]) {
+export function useIntelAgent(
+  agentId: IntelAgentId,
+  runtime: {
+    provider: IntelProviderId;
+    ollamaModels: string[];
+    geminiModel: string;
+    canRun: boolean;
+  },
+) {
   const agent = INTEL_AGENT_MAP[agentId];
   const [state, setState] = useState<IntelRunState>('idle');
   const [output, setOutput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [contextPreview, setContextPreview] = useState<string | null>(null);
+  const [lastModel, setLastModel] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+
+  const displayModel = providerModelLabel(runtime.provider, agent.model, runtime.geminiModel);
 
   const cancel = useCallback(() => {
     abortRef.current?.abort();
@@ -21,8 +34,8 @@ export function useIntelAgent(agentId: IntelAgentId, availableModels: string[]) 
 
   const run = useCallback(
     async (userPrompt?: string) => {
-      if (!availableModels.length) {
-        setError('No Ollama models installed. Run: ./scripts/ollama-setup.sh');
+      if (!runtime.canRun) {
+        setError('No AI provider available. Use local Ollama (npm run dev) or configure GEMINI_API_KEY.');
         setState('error');
         return;
       }
@@ -40,7 +53,6 @@ export function useIntelAgent(agentId: IntelAgentId, availableModels: string[]) 
         if (ac.signal.aborted) return;
         setContextPreview(contextJson.slice(0, 800) + (contextJson.length > 800 ? '…' : ''));
 
-        const model = pickModel(agent.model, availableModels);
         const messages: ChatMessage[] = [
           { role: 'system', content: agent.systemPrompt },
           {
@@ -50,12 +62,16 @@ export function useIntelAgent(agentId: IntelAgentId, availableModels: string[]) 
         ];
 
         setState('streaming');
-        await ollamaChat({
-          model,
+        const result = await intelChat({
+          provider: runtime.provider,
+          ollamaModels: runtime.ollamaModels,
+          ollamaModel: agent.model,
           messages,
           signal: ac.signal,
           onToken: (chunk) => setOutput((prev) => prev + chunk),
+          numPredict: 2048,
         });
+        setLastModel(result.model);
         if (!ac.signal.aborted) setState('done');
       } catch (e) {
         if (ac.signal.aborted) return;
@@ -65,8 +81,8 @@ export function useIntelAgent(agentId: IntelAgentId, availableModels: string[]) 
         abortRef.current = null;
       }
     },
-    [agent, availableModels],
+    [agent, runtime],
   );
 
-  return { agent, state, output, error, contextPreview, run, cancel };
+  return { agent, state, output, error, contextPreview, displayModel, lastModel, run, cancel };
 }
