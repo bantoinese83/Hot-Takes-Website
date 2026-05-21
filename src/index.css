@@ -1,3 +1,52 @@
+/* Referral invite landing (/join?ref=) */
+.join-invite-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.25rem;
+  background: var(--gradient-dark);
+}
+
+.join-invite-card {
+  max-width: 28rem;
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--bg-card);
+  text-align: center;
+}
+
+.join-invite-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin: 0 0 0.5rem;
+}
+
+.join-invite-card h1 {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+}
+
+.join-invite-code {
+  margin: 0 0 1rem;
+  color: var(--color-secondary);
+}
+
+.join-invite-hint {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.join-invite-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
 /* ==========================================
    DESIGN SYSTEM & DESIGN TOKENS
    ========================================== */
@@ -6,7 +55,7 @@
   --bg-dark: #111317;
   --bg-card: #1a1c1f;
   --bg-card-hover: #282a2d;
-  --bg-glass: rgba(26, 28, 31, 0.88);
+  --bg-glass: rgba(26, 28, 31, 0.45);
 
   --text-primary: #e2e2e6;
   --text-secondary: #e6bdb9;
@@ -36,7 +85,7 @@
   --border-accent: rgba(255, 84, 78, 0.45);
   --shadow-premium: 0 20px 40px -15px rgba(0, 0, 0, 0.55);
   --shadow-accent-glow: 0 0 32px rgba(255, 84, 78, 0.4);
-  --shadow-glass: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 10px 30px rgba(0, 0, 0, 0.35);
+  --shadow-glass: inset 0 1px 1px rgba(255, 255, 255, 0.12), 0 15px 35px rgba(0, 0, 0, 0.5);
 
   /* Typography — match iOS system feel */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;

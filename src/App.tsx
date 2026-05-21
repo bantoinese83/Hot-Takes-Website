@@ -17,12 +17,14 @@ import { GrowthPage } from './admin/pages/GrowthPage';
 import { UserDetailPage } from './admin/pages/UserDetailPage';
 import { SettingsPage } from './admin/pages/SettingsPage';
 import { IntelPage } from './admin/pages/IntelPage';
+import { JoinInvitePage } from './pages/JoinInvitePage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<MarketingSite />} />
+        <Route path="/join" element={<JoinInvitePage />} />
         <Route path="/privacy" element={<MarketingSite />} />
         <Route
           path="/admin/*"
