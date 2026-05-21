@@ -245,6 +245,64 @@ export type PlusWaitlistRow = {
   location_label: string | null;
 };
 
+export type LaunchWaitlistSignupRow = {
+  id: string;
+  email: string;
+  source: string;
+  created_at: string;
+  lat_bucket: number | null;
+  lng_bucket: number | null;
+};
+
+export type LaunchWaitlistDailyBucket = {
+  day: string;
+  signups: number;
+};
+
+export type LaunchWaitlistSourceBucket = {
+  source: string;
+  signups: number;
+};
+
+export type LaunchWaitlistGeoBucket = {
+  lat_bucket: number;
+  lng_bucket: number;
+  signup_count: number;
+  updated_at?: string;
+};
+
+export type LaunchWaitlistProgress = {
+  as_of: string;
+  signup_count: number;
+  waitlist_goal: number;
+  remaining: number;
+  percent: number;
+  unlocked: boolean;
+  released_at: string | null;
+  headline: string;
+};
+
+export type GrowthLaunchSnapshot = {
+  progress: LaunchWaitlistProgress;
+  total: number;
+  signups_24h: number;
+  signups_7d: number;
+  with_geo_count: number;
+  recent: LaunchWaitlistSignupRow[];
+  daily: LaunchWaitlistDailyBucket[];
+  by_source: LaunchWaitlistSourceBucket[];
+  geo_buckets: LaunchWaitlistGeoBucket[];
+};
+
+export type GrowthSnapshot = {
+  as_of?: string;
+  line_waitlist: LineWaitlistRow[];
+  plus_waitlist: PlusWaitlistRow[];
+  line_count: number;
+  plus_count: number;
+  launch?: GrowthLaunchSnapshot;
+};
+
 export type PairingHourBucket = {
   hour: string;
   queue_joins: number;
@@ -422,16 +480,33 @@ export async function fetchQueueSnapshot() {
   return data as { rows: QueueRow[]; waiting_count?: number; in_date_count?: number };
 }
 
-export async function fetchGrowthSnapshot() {
+export async function fetchGrowthSnapshot(): Promise<GrowthSnapshot> {
   const client = requireClient();
   const { data, error } = await client.rpc('admin_growth_snapshot');
   if (error) throw error;
-  return data as {
-    line_waitlist: LineWaitlistRow[];
-    plus_waitlist: PlusWaitlistRow[];
-    line_count: number;
-    plus_count: number;
-  };
+  return data as GrowthSnapshot;
+}
+
+export async function updateLaunchSettings(patch: {
+  waitlist_goal?: number;
+  headline?: string;
+  is_released?: boolean;
+}) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_update_launch_settings', {
+    p_waitlist_goal: patch.waitlist_goal ?? null,
+    p_headline: patch.headline ?? null,
+    p_is_released: patch.is_released ?? null,
+  });
+  if (error) throw error;
+  return data as { ok: boolean; progress: LaunchWaitlistProgress };
+}
+
+export async function deleteLaunchWaitlistSignup(id: string) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_delete_launch_waitlist_signup', { p_id: id });
+  if (error) throw error;
+  return data as { ok: boolean; deleted: boolean };
 }
 
 export async function fetchPairingFunnel24h() {

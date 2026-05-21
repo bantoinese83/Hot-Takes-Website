@@ -1,14 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Brain, Cloud, HardDrive, Play, Square, Zap } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Brain,
+  ChevronRight,
+  Cloud,
+  HardDrive,
+  Loader2,
+  Play,
+  Sparkles,
+  Square,
+  Zap,
+} from 'lucide-react';
 import { AdminPageShell } from '../components/AdminPageShell';
 import { AdminErrorBanner } from '../components/AdminErrorBanner';
-import { INTEL_AGENTS, type IntelAgentId } from '../lib/intelAgents';
-import { useIntelAgent } from '../hooks/useIntelAgent';
+import { IntelMarkdown } from '../components/IntelMarkdown';
+import {
+  INTEL_AGENTS,
+  INTEL_AGENT_MAP,
+  type IntelAgentDef,
+  type IntelAgentId,
+} from '../lib/intelAgents';
+import { useIntelAgent, type IntelRunState } from '../hooks/useIntelAgent';
 import { runLightTeamBrief } from '../lib/runTeamBrief';
 import { resolveIntelRuntime, type IntelRuntime } from '../lib/intelProvider';
 import { pickBatchModel } from '../lib/intelLlm';
 import { ollamaHealth, type OllamaModel } from '../lib/ollamaClient';
 import '../admin.css';
+
+const DIRECTOR_ID: IntelAgentId = 'intel-director';
+const SPECIALISTS = INTEL_AGENTS.filter((a) => a.id !== DIRECTOR_ID);
+const DIRECTOR = INTEL_AGENT_MAP[DIRECTOR_ID];
 
 function formatModelSize(bytes?: number): string {
   if (!bytes) return '';
@@ -16,101 +36,190 @@ function formatModelSize(bytes?: number): string {
   return gb >= 1 ? `${gb.toFixed(1)} GB` : `${(bytes / 1e6).toFixed(0)} MB`;
 }
 
-function AgentPanel({
+function stateLabel(state: IntelRunState): string | null {
+  if (state === 'loading-data') return 'Loading data';
+  if (state === 'streaming') return 'Thinking';
+  if (state === 'done') return 'Ready';
+  if (state === 'error') return 'Error';
+  return null;
+}
+
+function AgentRosterButton({
+  agent,
+  selected,
+  displayModel,
+  runState,
+  onSelect,
+}: {
+  agent: IntelAgentDef;
+  selected: boolean;
+  displayModel: string;
+  runState: IntelRunState;
+  onSelect: () => void;
+}) {
+  const Icon = agent.icon;
+  const busy = runState === 'loading-data' || runState === 'streaming';
+  const status = stateLabel(runState);
+
+  return (
+    <button
+      type="button"
+      className={`intel-roster-item${selected ? ' intel-roster-item--active' : ''}${
+        agent.id === DIRECTOR_ID ? ' intel-roster-item--director' : ''
+      }`}
+      onClick={onSelect}
+      aria-current={selected ? 'true' : undefined}
+    >
+      <span className="intel-roster-icon">
+        <Icon size={17} aria-hidden />
+      </span>
+      <span className="intel-roster-copy">
+        <span className="intel-roster-codename">{agent.codename}</span>
+        <span className="intel-roster-name">{agent.name}</span>
+      </span>
+      <span className="intel-roster-tail">
+        {busy ? (
+          <Loader2 size={14} className="intel-roster-spin" aria-hidden />
+        ) : status && selected ? (
+          <span className={`intel-roster-pill intel-roster-pill--${runState}`}>{status}</span>
+        ) : (
+          <ChevronRight size={14} className="intel-roster-chevron" aria-hidden />
+        )}
+      </span>
+      <span className="intel-roster-model" title={displayModel}>
+        {displayModel}
+      </span>
+    </button>
+  );
+}
+
+function AgentWorkspace({
   agentId,
   runtime,
-  selected,
-  onSelect,
+  onStateChange,
 }: {
   agentId: IntelAgentId;
   runtime: IntelRuntime;
-  selected: boolean;
-  onSelect: () => void;
+  onStateChange?: (state: IntelRunState) => void;
 }) {
-  const { agent, state, output, error, contextPreview, displayModel, run, cancel } = useIntelAgent(
+  const agent = INTEL_AGENT_MAP[agentId];
+  const { state, output, error, contextPreview, displayModel, run, cancel } = useIntelAgent(
     agentId,
     runtime,
   );
   const [followUp, setFollowUp] = useState('');
+
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
   const Icon = agent.icon;
   const busy = state === 'loading-data' || state === 'streaming';
+  const status = stateLabel(state);
 
   return (
-    <article className={`intel-agent-card ${selected ? 'intel-agent-card--active' : ''}`}>
-      <button type="button" className="intel-agent-card-head" onClick={onSelect}>
-        <span className="intel-agent-icon">
-          <Icon size={18} aria-hidden />
-        </span>
-        <span className="intel-agent-meta">
-          <span className="intel-agent-codename">{agent.codename}</span>
-          <span className="intel-agent-name">{agent.name}</span>
-          <span className="intel-agent-role">{agent.role}</span>
-        </span>
-        <span className="intel-agent-model">{displayModel}</span>
-      </button>
-
-      {selected ? (
-        <div className="intel-agent-body">
-          <div className="intel-agent-actions">
-            <button
-              type="button"
-              className="admin-btn admin-btn--primary"
-              disabled={busy || !runtime.canRun}
-              onClick={() => void run()}
-            >
-              <Play size={14} aria-hidden /> Run brief
-            </button>
-            {busy ? (
-              <button type="button" className="admin-btn admin-btn--ghost" onClick={cancel}>
-                <Square size={14} aria-hidden /> Stop
-              </button>
-            ) : null}
+    <section className="intel-stage" aria-labelledby="intel-stage-title">
+      <header className="intel-stage-header">
+        <div className="intel-stage-identity">
+          <span className="intel-stage-icon">
+            <Icon size={22} aria-hidden />
+          </span>
+          <div>
+            <p className="intel-stage-codename">{agent.codename}</p>
+            <h2 id="intel-stage-title" className="intel-stage-title">
+              {agent.name}
+            </h2>
+            <p className="intel-stage-role">{agent.role}</p>
           </div>
-
-          <label className="intel-followup-label">
-            Follow-up
-            <textarea
-              className="intel-followup-input"
-              rows={2}
-              placeholder="Ask a specific question…"
-              value={followUp}
-              onChange={(e) => setFollowUp(e.target.value)}
-              disabled={busy}
-            />
-          </label>
-          {followUp.trim() ? (
-            <button
-              type="button"
-              className="admin-btn admin-btn--secondary"
-              disabled={busy || !runtime.canRun}
-              onClick={() => void run(followUp)}
-            >
-              Send follow-up
-            </button>
-          ) : null}
-
-          {contextPreview && state !== 'idle' ? (
-            <details className="intel-context-details">
-              <summary>Data fed to model</summary>
-              <pre>{contextPreview}</pre>
-            </details>
-          ) : null}
-
-          {error ? <p className="intel-agent-error">{error}</p> : null}
-
-          {output ? (
-            <div className="intel-output" aria-live="polite">
-              <pre>{output}</pre>
-              {state === 'streaming' ? <span className="intel-cursor" aria-hidden /> : null}
-            </div>
-          ) : state === 'loading-data' ? (
-            <p className="admin-loading">Loading Supabase admin data…</p>
-          ) : state === 'streaming' && !output ? (
-            <p className="admin-loading">Thinking…</p>
+        </div>
+        <div className="intel-stage-badges">
+          <span className="intel-chip">
+            <code>{displayModel}</code>
+          </span>
+          {status ? (
+            <span className={`intel-chip intel-chip--status intel-chip--${state}`}>{status}</span>
           ) : null}
         </div>
+      </header>
+
+      <div className="intel-stage-toolbar">
+        <button
+          type="button"
+          className="admin-btn admin-btn--primary"
+          disabled={busy || !runtime.canRun}
+          onClick={() => void run()}
+        >
+          <Play size={15} aria-hidden />
+          Run brief
+        </button>
+        {busy ? (
+          <button type="button" className="admin-btn admin-btn--ghost" onClick={cancel}>
+            <Square size={15} aria-hidden />
+            Stop
+          </button>
+        ) : null}
+      </div>
+
+      <div className="intel-composer">
+        <label className="intel-composer-label" htmlFor="intel-followup">
+          Follow-up question
+        </label>
+        <div className="intel-composer-row">
+          <textarea
+            id="intel-followup"
+            className="intel-composer-input"
+            rows={2}
+            placeholder="Ask something specific about this dataset…"
+            value={followUp}
+            onChange={(e) => setFollowUp(e.target.value)}
+            disabled={busy}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && followUp.trim()) {
+                e.preventDefault();
+                void run(followUp);
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="admin-btn admin-btn--secondary intel-composer-send"
+            disabled={busy || !runtime.canRun || !followUp.trim()}
+            onClick={() => void run(followUp)}
+          >
+            Send
+          </button>
+        </div>
+        <p className="intel-composer-hint">⌘↵ to send · Uses live Supabase admin snapshot</p>
+      </div>
+
+      {contextPreview && state !== 'idle' ? (
+        <details className="intel-context-details">
+          <summary>Data fed to model</summary>
+          <pre>{contextPreview}</pre>
+        </details>
       ) : null}
-    </article>
+
+      {error ? <p className="intel-agent-error">{error}</p> : null}
+
+      <div className="intel-stage-output-wrap">
+        {output ? (
+          <div className="intel-output intel-output--stage" aria-live="polite">
+            <IntelMarkdown content={output} />
+            {state === 'streaming' ? <span className="intel-cursor" aria-hidden /> : null}
+          </div>
+        ) : busy ? (
+          <div className="intel-output-placeholder" aria-busy="true">
+            <Loader2 size={28} className="intel-roster-spin" aria-hidden />
+            <p>{state === 'loading-data' ? 'Pulling admin metrics…' : 'Drafting brief…'}</p>
+          </div>
+        ) : (
+          <div className="intel-output-placeholder">
+            <Sparkles size={28} aria-hidden className="intel-placeholder-icon" />
+            <p className="intel-placeholder-title">No brief yet</p>
+            <p className="intel-placeholder-sub">{agent.starterPrompt}</p>
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -118,12 +227,14 @@ export function IntelPage() {
   const [runtime, setRuntime] = useState<IntelRuntime | null>(null);
   const [ollamaModels, setOllamaModels] = useState<OllamaModel[]>([]);
   const [loadingRuntime, setLoadingRuntime] = useState(true);
-  const [selectedId, setSelectedId] = useState<IntelAgentId>('intel-director');
+  const [selectedId, setSelectedId] = useState<IntelAgentId>(DIRECTOR_ID);
   const [briefRunning, setBriefRunning] = useState(false);
   const [briefLog, setBriefLog] = useState<string[]>([]);
+  const [briefOpen, setBriefOpen] = useState(true);
   const [fullBrief, setFullBrief] = useState<string | null>(() =>
     typeof localStorage !== 'undefined' ? localStorage.getItem('ht_intel_last_brief') : null,
   );
+  const [activeRunState, setActiveRunState] = useState<IntelRunState>('idle');
   const briefAbortRef = useRef<AbortController | null>(null);
 
   const refreshRuntime = useCallback(async () => {
@@ -159,6 +270,7 @@ export function IntelPage() {
         : runtime.geminiModel;
 
     setBriefRunning(true);
+    setBriefOpen(true);
     setBriefLog([`Team brief · ${runtime.label} · ${modelLabel}`]);
 
     try {
@@ -170,7 +282,7 @@ export function IntelPage() {
       });
       setFullBrief(combined);
       localStorage.setItem('ht_intel_last_brief', combined);
-      setSelectedId('intel-director');
+      setSelectedId(DIRECTOR_ID);
       setBriefLog([]);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return;
@@ -182,46 +294,78 @@ export function IntelPage() {
   };
 
   const ProviderIcon = runtime?.provider === 'ollama' ? HardDrive : Cloud;
+  const directorModel = useMemo(
+    () =>
+      runtime
+        ? runtime.provider === 'gemini'
+          ? runtime.geminiModel
+          : DIRECTOR.model
+        : '—',
+    [runtime],
+  );
 
   return (
     <AdminPageShell
       title="Intel team"
-      subtitle="Ollama on your Mac when developing · Gemini 3.5 Flash on the live admin"
+      subtitle="Multi-agent ops briefs · local Ollama in dev · Gemini on production"
       actions={
         <div className="intel-page-actions">
           <button
             type="button"
-            className="admin-btn admin-btn--primary"
+            className="admin-btn admin-btn--primary intel-btn-brief"
             disabled={!runtime?.canRun || briefRunning || loadingRuntime}
             onClick={() => void runFullBrief()}
           >
-            <Zap size={14} aria-hidden /> Run team brief
+            <Zap size={15} aria-hidden />
+            Run team brief
           </button>
           {briefRunning ? (
             <button type="button" className="admin-btn admin-btn--ghost" onClick={cancelBrief}>
-              <Square size={14} aria-hidden /> Stop
+              <Square size={15} aria-hidden />
+              Stop
             </button>
           ) : null}
         </div>
       }
     >
       <div
-        className={`intel-status ${runtime?.canRun ? 'intel-status--ok' : 'intel-status--err'}`}
+        className={`intel-hero${runtime?.canRun ? ' intel-hero--live' : ' intel-hero--offline'}`}
       >
-        {runtime ? <ProviderIcon size={20} aria-hidden /> : <Brain size={20} aria-hidden />}
-        <div>
-          <strong>
-            {loadingRuntime
-              ? 'Checking providers…'
-              : runtime?.canRun
-                ? `Active: ${runtime.label}`
-                : 'No provider available'}
-          </strong>
-          <p>{runtime?.detail ?? 'Connect Ollama locally or set GEMINI_API_KEY on Supabase.'}</p>
+        <div className="intel-hero-glow" aria-hidden />
+        <div className="intel-hero-main">
+          <div className="intel-hero-icon">
+            {runtime ? <ProviderIcon size={22} aria-hidden /> : <Brain size={22} aria-hidden />}
+          </div>
+          <div className="intel-hero-copy">
+            <p className="intel-hero-label">Inference provider</p>
+            <strong>
+              {loadingRuntime
+                ? 'Checking providers…'
+                : runtime?.canRun
+                  ? runtime.label
+                  : 'No provider available'}
+            </strong>
+            <p>{runtime?.detail ?? 'Start Ollama locally or set GEMINI_API_KEY on Supabase.'}</p>
+          </div>
+        </div>
+        <div className="intel-hero-chips">
+          {runtime?.provider === 'gemini' && runtime.geminiConfigured ? (
+            <span className="intel-chip">
+              <Cloud size={12} aria-hidden />
+              <code>{runtime.geminiModel}</code>
+            </span>
+          ) : null}
+          {runtime?.provider === 'ollama' ? (
+            <span className="intel-chip">
+              <HardDrive size={12} aria-hidden />
+              Team brief · <code>llama3.2:3b</code>
+            </span>
+          ) : null}
+          <span className="intel-chip intel-chip--muted">{INTEL_AGENTS.length} agents</span>
         </div>
         <button
           type="button"
-          className="admin-btn admin-btn--ghost"
+          className="admin-btn admin-btn--ghost intel-hero-refresh"
           onClick={() => void refreshRuntime()}
           disabled={loadingRuntime}
         >
@@ -234,7 +378,7 @@ export function IntelPage() {
       ) : null}
 
       {runtime?.provider === 'ollama' && ollamaModels.length > 0 ? (
-        <ul className="intel-model-list">
+        <ul className="intel-model-strip">
           {ollamaModels.map((m) => (
             <li key={m.name}>
               <code>{m.name}</code>
@@ -244,43 +388,70 @@ export function IntelPage() {
         </ul>
       ) : null}
 
-      {runtime?.provider === 'gemini' && runtime.geminiConfigured ? (
-        <p className="admin-hint-card">
-          Cloud model: <code>{runtime.geminiModel}</code> · generateContent · thinking{' '}
-          <code>low</code> (cost-efficient). Override via Supabase secret{' '}
-          <code>GEMINI_INTEL_MODEL</code> (e.g. <code>gemini-2.5-flash-lite</code>).
-        </p>
-      ) : null}
-
-      {runtime?.provider === 'ollama' ? (
-        <p className="admin-hint-card intel-memory-hint" role="note">
-          <strong>Memory:</strong> Team brief uses only <code>llama3.2:3b</code>. On production URL we
-          automatically use Gemini instead.
-        </p>
-      ) : null}
-
       {briefRunning && briefLog.length ? (
-        <p className="admin-hint-card intel-brief-progress">{briefLog[briefLog.length - 1]}</p>
+        <div className="intel-brief-progress" role="status">
+          <Loader2 size={16} className="intel-roster-spin" aria-hidden />
+          <span>{briefLog[briefLog.length - 1]}</span>
+        </div>
       ) : null}
 
       {fullBrief ? (
-        <details className="intel-full-brief" open={briefRunning}>
-          <summary>Last full-team brief</summary>
-          <pre>{fullBrief}</pre>
+        <details
+          className="intel-full-brief"
+          open={briefOpen}
+          onToggle={(e) => setBriefOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary>
+            <span className="intel-full-brief-title">
+              <Sparkles size={16} aria-hidden />
+              Last executive brief
+            </span>
+            <span className="intel-full-brief-meta">Director synthesis</span>
+          </summary>
+          <div className="intel-full-brief-body">
+            <IntelMarkdown content={fullBrief} />
+          </div>
         </details>
       ) : null}
 
       {runtime ? (
-        <div className="intel-agent-grid">
-          {INTEL_AGENTS.map((a) => (
-            <AgentPanel
-              key={a.id}
-              agentId={a.id}
-              runtime={runtime}
-              selected={selectedId === a.id}
-              onSelect={() => setSelectedId(a.id)}
+        <div className="intel-workspace">
+          <aside className="intel-roster" aria-label="Intel agents">
+            <p className="intel-roster-heading">Orchestrator</p>
+            <AgentRosterButton
+              agent={DIRECTOR}
+              selected={selectedId === DIRECTOR_ID}
+              displayModel={directorModel}
+              runState={selectedId === DIRECTOR_ID ? activeRunState : 'idle'}
+              onSelect={() => setSelectedId(DIRECTOR_ID)}
             />
-          ))}
+            <p className="intel-roster-heading">Specialists</p>
+            <nav className="intel-roster-list">
+              {SPECIALISTS.map((a) => (
+                <AgentRosterButton
+                  key={a.id}
+                  agent={a}
+                  selected={selectedId === a.id}
+                  displayModel={
+                    runtime.provider === 'gemini' ? runtime.geminiModel : a.model
+                  }
+                  runState={selectedId === a.id ? activeRunState : 'idle'}
+                  onSelect={() => setSelectedId(a.id)}
+                />
+              ))}
+            </nav>
+            <p className="intel-roster-foot">
+              {runtime.provider === 'ollama'
+                ? 'Production admin uses Gemini automatically.'
+                : 'Gemini via admin-intel edge function.'}
+            </p>
+          </aside>
+          <AgentWorkspace
+            key={selectedId}
+            agentId={selectedId}
+            runtime={runtime}
+            onStateChange={setActiveRunState}
+          />
         </div>
       ) : null}
     </AdminPageShell>
