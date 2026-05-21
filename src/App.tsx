@@ -17,6 +17,11 @@ import { GrowthPage } from './admin/pages/GrowthPage';
 import { UserDetailPage } from './admin/pages/UserDetailPage';
 import { SettingsPage } from './admin/pages/SettingsPage';
 import { IntelPage } from './admin/pages/IntelPage';
+import { RevenueHealthPage } from './admin/pages/RevenueHealthPage';
+import { TrustRadarPage } from './admin/pages/TrustRadarPage';
+import { PushComposerPage } from './admin/pages/PushComposerPage';
+import { DateQualityPage } from './admin/pages/DateQualityPage';
+import { SystemHealthPage } from './admin/pages/SystemHealthPage';
 import { JoinInvitePage } from './pages/JoinInvitePage';
 
 export default function App() {
@@ -47,6 +52,11 @@ export default function App() {
                     <Route path="pairing" element={<PairingPage />} />
                     <Route path="community" element={<CommunityPage />} />
                     <Route path="intel" element={<IntelPage />} />
+                    <Route path="revenue" element={<RevenueHealthPage />} />
+                    <Route path="trust" element={<TrustRadarPage />} />
+                    <Route path="push" element={<PushComposerPage />} />
+                    <Route path="dates" element={<DateQualityPage />} />
+                    <Route path="health" element={<SystemHealthPage />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/admin" replace />} />

@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Flag, Globe2, LineChart, MessageSquareQuote, Radar, Sparkles, Users } from 'lucide-react';
+import { Flag, Globe2, LineChart, MessageSquareQuote, Radar, Sparkles, Users, Settings } from 'lucide-react';
 import type { IntelContextScope } from './intelContext';
 
 export type IntelAgentId =
@@ -9,6 +9,8 @@ export type IntelAgentId =
   | 'geo-strategist'
   | 'queue-watcher'
   | 'community-editor'
+  | 'user-analyst'
+  | 'algorithm-tuner'
   | 'intel-director';
 
 export type IntelAgentDef = {
@@ -121,6 +123,34 @@ Flag outliers (long waits, incomplete profiles in queue). Suggest ops interventi
 Review community prompts: vote balance, categories, stale copy.
 Propose 3 new prompt drafts (slug + body) aligned with Hot Take brand: opinionated, fun, debatable, not offensive.`,
     starterPrompt: 'Review community prompts and propose 3 new Takes with predicted engagement angles.',
+  },
+  {
+    id: 'user-analyst',
+    name: 'User Analyst',
+    codename: 'PROFILER',
+    role: 'Behavioral patterns, risk assessment, and support history',
+    model: 'llama3.2:3b',
+    icon: Users,
+    contextScope: 'user',
+    systemPrompt: `${BASE_RULES}
+Analyze this specific user's profile and activity history.
+Summarize: (1) behavior patterns (frequency, success, toxicity), (2) risk level (low/med/high) based on reports, (3) matching viability, (4) recommendation for ops/moderation.`,
+    starterPrompt: 'Analyze this user. Are they a good actor, a bad actor, or just stuck?',
+  },
+  {
+    id: 'algorithm-tuner',
+    name: 'Algorithm Tuner',
+    codename: 'CALIBRATOR',
+    role: 'Pairing engine optimization and weight adjustment',
+    model: 'llama3.1:8b',
+    icon: Settings,
+    contextScope: 'ops',
+    systemPrompt: `${BASE_RULES}
+Analyze the current pairing funnel and wait time statistics.
+Review the current pairing weights (if visible in context).
+Suggest specific numeric adjustments to: (1) embedding similarity, (2) wait bonuses, (3) age penalties, or (4) alignment bonuses.
+Explain the rationale: e.g., 'Increase wait bonus by 0.05 to address tail wait spike at 19:00'.`,
+    starterPrompt: 'How can we tune the pairing weights to improve conversion and reduce tail wait times?',
   },
 ];
 

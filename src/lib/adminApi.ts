@@ -141,6 +141,13 @@ export type AdminAnalyticsHub = {
     cancelled_7d: number;
   };
   hot_take_categories: { category: string; count: number }[];
+  top_prompts?: {
+    slug: string;
+    body: string;
+    hot_count: number;
+    cold_count: number;
+    category_label: string;
+  }[];
   activity_feed: ActivityFeedItem[];
 };
 
@@ -165,11 +172,21 @@ export type ModerationReport = {
 export type AdminProfileDetail = {
   id: string;
   name: string | null;
+  avatar_url: string | null;
   hot_take: string | null;
   hot_take_category: string | null;
   location_label: string | null;
   latitude: number | null;
   longitude: number | null;
+  gender_identity: string | null;
+  ethnicity_self: string[] | null;
+  religion_self: string | null;
+  politics_self: string | null;
+  intent_self: string | null;
+  birthdate: string | null;
+  height_cm: number | null;
+  kids_self: string | null;
+  smoking_self: string | null;
   subscription_tier: string;
   referral_code: string | null;
   referred_by_user_id: string | null;
@@ -182,6 +199,8 @@ export type AdminProfileDetail = {
   in_queue: boolean;
   queue_status: string | null;
   on_line_waitlist: boolean;
+  profile_photo_urls: string[] | null;
+  match_contrarian_mode: boolean;
 };
 
 export type WebsiteAdminRow = {
@@ -207,6 +226,7 @@ export type CommunityPromptAdmin = {
 export type AdminProfileRow = {
   id: string;
   name: string | null;
+  avatar_url: string | null;
   location_label?: string | null;
   matching_complete: boolean;
   age_affirmed: boolean;
@@ -214,6 +234,22 @@ export type AdminProfileRow = {
   referral_code: string | null;
   notify_line_live: boolean;
   keep_matching_when_away: boolean;
+};
+
+export type PairingWeight = {
+  key: string;
+  value: number;
+  description: string;
+  updated_at: string;
+};
+
+export type SimulatedMatch = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  location_label: string | null;
+  score: number;
+  compatible: boolean;
 };
 
 export type QueueRow = {
@@ -463,14 +499,15 @@ export async function removeWebsiteAdmin(email: string) {
   return data as { ok: boolean };
 }
 
-export async function searchProfiles(query: string, limit = 30) {
+export async function searchProfiles(query: string, limit = 30, offset = 0) {
   const client = requireClient();
   const { data, error } = await client.rpc('admin_search_profiles', {
     p_query: query,
     p_limit: limit,
+    p_offset: offset,
   });
   if (error) throw error;
-  return data as { profiles: AdminProfileRow[]; query: string; total?: number };
+  return data as { profiles: AdminProfileRow[]; query: string; total: number; limit: number; offset: number };
 }
 
 export async function fetchQueueSnapshot() {
@@ -615,6 +652,53 @@ export async function fetchAdminAnalyticsHub(): Promise<AdminAnalyticsHub> {
   return data as AdminAnalyticsHub;
 }
 
+export async function fetchUserActivity(userId: string, limit = 100, offset = 0) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_get_user_activity', {
+    p_user_id: userId,
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw error;
+  return data as { user_id: string; activity: ActivityFeedItem[]; has_more: boolean };
+}
+
+export async function fetchPairingWeights() {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_list_pairing_weights');
+  if (error) throw error;
+  return data as PairingWeight[];
+}
+
+export async function updatePairingWeight(key: string, value: number) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_update_pairing_weight', {
+    p_key: key,
+    p_value: value,
+  });
+  if (error) throw error;
+  return data as { ok: boolean };
+}
+
+export async function simulatePairing(userId: string) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_simulate_pairing', {
+    p_user_id: userId,
+  });
+  if (error) throw error;
+  return data as { user_id: string; top_matches: SimulatedMatch[] };
+}
+
+export async function fetchActivityLog(limit = 50, offset = 0) {
+  const client = requireClient();
+  const { data, error } = await client.rpc('admin_list_activity_log', {
+    p_limit: limit,
+    p_offset: offset,
+  });
+  if (error) throw error;
+  return data as { total: number; limit: number; offset: number; items: ActivityFeedItem[] };
+}
+
 /** Rich geography data (map layers, regions, queue overlay). Falls back to analytics hub shape when RPC missing. */
 export async function fetchAdminGeographySnapshot(): Promise<AdminGeographySnapshot> {
   const client = requireClient();
@@ -665,4 +749,426 @@ export function formatWaitMs(ms: number | null | undefined): string {
   const min = Math.floor(sec / 60);
   const rem = sec % 60;
   return rem > 0 ? `${min}m ${rem}s` : `${min}m`;
+}
+
+// ─── REVENUE HEALTH ───────────────────────────────────────────
+
+export type SubscriptionTierBreakdown = {
+  tier: string;
+  count: number;
+  pct: number;
+};
+
+export type SubscriptionHealthSnapshot = {
+  as_of: string;
+  total_profiles: number;
+  tiers: SubscriptionTierBreakdown[];
+  conversions_7d: number;
+  conversions_30d: number;
+  plus_waitlist_to_plus_rate: number | null;
+};
+
+export async function fetchSubscriptionHealth(): Promise<SubscriptionHealthSnapshot> {
+  const client = requireClient();
+  // Query profiles table directly for tier breakdown
+  const { data: tiers, error: e1 } = await client
+    .from('profiles')
+    .select('subscription_tier')
+    .not('subscription_tier', 'is', null);
+  if (e1) throw e1;
+
+  const rows = (tiers ?? []) as { subscription_tier: string }[];
+  const total = rows.length;
+  const counts: Record<string, number> = {};
+  for (const r of rows) {
+    counts[r.subscription_tier] = (counts[r.subscription_tier] ?? 0) + 1;
+  }
+  const tierBreakdown: SubscriptionTierBreakdown[] = Object.entries(counts).map(([tier, count]) => ({
+    tier,
+    count,
+    pct: total > 0 ? Math.round((count / total) * 1000) / 10 : 0,
+  }));
+
+  const plusCount = counts['plus'] ?? 0;
+  const plusWaitlistCount = counts['plus_waitlist'] ?? 0;
+
+  return {
+    as_of: new Date().toISOString(),
+    total_profiles: total,
+    tiers: tierBreakdown.sort((a, b) => b.count - a.count),
+    conversions_7d: 0, // Would need pairing_events or audit log
+    conversions_30d: 0,
+    plus_waitlist_to_plus_rate:
+      plusWaitlistCount + plusCount > 0
+        ? Math.round((plusCount / (plusWaitlistCount + plusCount)) * 1000) / 10
+        : null,
+  };
+}
+
+// ─── TRUST RADAR ──────────────────────────────────────────────
+
+export type TrustRadarUser = {
+  user_id: string;
+  name: string | null;
+  avatar_url: string | null;
+  reports_received: number;
+  reports_filed: number;
+  blocks_received: number;
+  risk_score: number;
+  risk_level: 'high' | 'medium' | 'low';
+  latest_report_at: string | null;
+};
+
+export async function fetchTrustRadar(limit = 50): Promise<{ users: TrustRadarUser[]; as_of: string }> {
+  const client = requireClient();
+
+  // Reports received — grouped by reported_user_id
+  const { data: received, error: e1 } = await client
+    .from('moderation_reports')
+    .select('reported_user_id, created_at')
+    .order('created_at', { ascending: false });
+  if (e1) throw e1;
+
+  // Reports filed — grouped by reporter_id
+  const { data: filed, error: e2 } = await client
+    .from('moderation_reports')
+    .select('reporter_id');
+  if (e2) throw e2;
+
+  const receivedMap: Record<string, { count: number; latest: string }> = {};
+  for (const r of (received ?? []) as { reported_user_id: string; created_at: string }[]) {
+    if (!receivedMap[r.reported_user_id]) receivedMap[r.reported_user_id] = { count: 0, latest: r.created_at };
+    receivedMap[r.reported_user_id].count += 1;
+  }
+
+  const filedMap: Record<string, number> = {};
+  for (const r of (filed ?? []) as { reporter_id: string }[]) {
+    filedMap[r.reporter_id] = (filedMap[r.reporter_id] ?? 0) + 1;
+  }
+
+  const allIds = [...new Set([...Object.keys(receivedMap), ...Object.keys(filedMap)])];
+  const topIds = allIds
+    .map((id) => ({
+      id,
+      score: (receivedMap[id]?.count ?? 0) * 3 + (filedMap[id] ?? 0),
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map((x) => x.id);
+
+  if (topIds.length === 0) return { users: [], as_of: new Date().toISOString() };
+
+  const { data: profiles, error: e3 } = await client
+    .from('profiles')
+    .select('id, name, avatar_url')
+    .in('id', topIds);
+  if (e3) throw e3;
+
+  const profileMap: Record<string, { name: string | null; avatar_url: string | null }> = {};
+  for (const p of (profiles ?? []) as { id: string; name: string | null; avatar_url: string | null }[]) {
+    profileMap[p.id] = { name: p.name, avatar_url: p.avatar_url };
+  }
+
+  const users: TrustRadarUser[] = topIds.map((id) => {
+    const rr = receivedMap[id]?.count ?? 0;
+    const rf = filedMap[id] ?? 0;
+    const score = rr * 3 + rf;
+    const risk_level: TrustRadarUser['risk_level'] = score >= 9 ? 'high' : score >= 3 ? 'medium' : 'low';
+    return {
+      user_id: id,
+      name: profileMap[id]?.name ?? null,
+      avatar_url: profileMap[id]?.avatar_url ?? null,
+      reports_received: rr,
+      reports_filed: rf,
+      blocks_received: 0,
+      risk_score: score,
+      risk_level,
+      latest_report_at: receivedMap[id]?.latest ?? null,
+    };
+  });
+
+  return { users, as_of: new Date().toISOString() };
+}
+
+// ─── PUSH NOTIFICATIONS ────────────────────────────────────────
+
+export type PushHistoryRow = {
+  id: string;
+  created_at: string;
+  kind: string;
+  title: string | null;
+  body: string | null;
+  recipient_count: number | null;
+  target_filter: string | null;
+  sent_by: string | null;
+};
+
+export type SendPushInput = {
+  title: string;
+  body: string;
+  deep_link?: string;
+  target: 'all' | 'plus' | 'free' | 'location';
+  target_location?: string;
+};
+
+export async function fetchPushHistory(limit = 30): Promise<PushHistoryRow[]> {
+  const client = requireClient();
+  // Query push_notification_log if it exists; return empty array gracefully
+  const { data, error } = await client
+    .from('push_notification_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    // Table may not exist — return empty
+    return [];
+  }
+  return (data ?? []) as PushHistoryRow[];
+}
+
+export async function estimatePushAudience(target: SendPushInput['target'], location?: string): Promise<number> {
+  const client = requireClient();
+  let query = client.from('profiles').select('id', { count: 'exact', head: true });
+  if (target === 'plus') query = query.eq('subscription_tier', 'plus');
+  else if (target === 'free') query = query.eq('subscription_tier', 'free');
+  else if (target === 'location' && location) query = query.ilike('location_label', `%${location}%`);
+  const { count, error } = await query;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function sendAdminPush(input: SendPushInput): Promise<{ ok: boolean; sent: number }> {
+  const client = requireClient();
+  const { data, error } = await client.functions.invoke('admin-send-push', { body: input });
+  if (error) throw error;
+  const payload = data as { ok?: boolean; sent?: number } | null;
+  if (!payload?.ok) {
+    throw new Error('Push send failed');
+  }
+  return { ok: true, sent: payload.sent ?? 0 };
+}
+
+// ─── DATE QUALITY ──────────────────────────────────────────────
+
+export type DateRow = {
+  id: string;
+  started_at: string | null;
+  ended_at: string | null;
+  status: string | null;
+  user1_id: string;
+  user2_id: string;
+  livekit_room_name: string | null;
+  duration_ms: number | null;
+};
+
+export type DateQualitySnapshot = {
+  as_of: string;
+  active_now: DateRow[];
+  recent_completed: DateRow[];
+  stats: {
+    total_today: number;
+    avg_duration_ms: number | null;
+    completion_rate: number | null;
+    early_end_rate: number | null;
+    duration_buckets: { label: string; count: number }[];
+  };
+};
+
+export async function fetchDateQualitySnapshot(): Promise<DateQualitySnapshot> {
+  const client = requireClient();
+  const dayAgo = new Date(Date.now() - 86400_000).toISOString();
+
+  const { data, error } = await client
+    .from('dates')
+    .select('id, started_at, ended_at, status, user1_id, user2_id, livekit_room_name')
+    .gte('started_at', dayAgo)
+    .order('started_at', { ascending: false })
+    .limit(200);
+  if (error) throw error;
+
+  const rows = (data ?? []) as DateRow[];
+  const active = rows.filter((r) => r.status === 'active' || !r.ended_at);
+  const completed = rows.filter((r) => r.status === 'completed' || r.ended_at);
+
+  const durations = completed
+    .filter((r) => r.started_at && r.ended_at)
+    .map((r) => new Date(r.ended_at!).getTime() - new Date(r.started_at!).getTime());
+
+  const avgDuration = durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : null;
+
+  const buckets = [
+    { label: '< 1 min', max: 60_000 },
+    { label: '1–3 min', max: 180_000 },
+    { label: '3–5 min', max: 300_000 },
+    { label: '5–10 min', max: 600_000 },
+    { label: '10+ min', max: Infinity },
+  ];
+
+  const durationBuckets = buckets.map(({ label, max }, i) => {
+    const min = i === 0 ? 0 : buckets[i - 1].max;
+    return { label, count: durations.filter((d) => d >= min && d < max).length };
+  });
+
+  return {
+    as_of: new Date().toISOString(),
+    active_now: active,
+    recent_completed: completed.slice(0, 50),
+    stats: {
+      total_today: rows.length,
+      avg_duration_ms: avgDuration,
+      completion_rate: rows.length > 0 ? Math.round((completed.length / rows.length) * 100) : null,
+      early_end_rate: null,
+      duration_buckets: durationBuckets,
+    },
+  };
+}
+
+// ─── SYSTEM HEALTH ──────────────────────────────────────────────
+
+export type SystemHealthCheck = {
+  name: string;
+  status: 'ok' | 'warn' | 'error' | 'checking';
+  latency_ms: number | null;
+  detail: string;
+  checked_at: string;
+};
+
+export async function pingMatchmakerHealth(): Promise<SystemHealthCheck> {
+  const client = requireClient();
+  const start = Date.now();
+  try {
+    const { error } = await client.functions.invoke('matchmaker', {
+      body: { _health_check: true },
+    });
+    const latency = Date.now() - start;
+    return {
+      name: 'matchmaker edge fn',
+      status: error ? 'warn' : 'ok',
+      latency_ms: latency,
+      detail: error ? `Response error: ${error.message}` : `OK in ${latency}ms`,
+      checked_at: new Date().toISOString(),
+    };
+  } catch (err) {
+    return {
+      name: 'matchmaker edge fn',
+      status: 'error',
+      latency_ms: Date.now() - start,
+      detail: err instanceof Error ? err.message : 'Unreachable',
+      checked_at: new Date().toISOString(),
+    };
+  }
+}
+
+export async function fetchQueueHealthCheck(): Promise<{
+  stale_entries: number;
+  orphaned_in_date: number;
+  longest_wait_ms: number | null;
+}> {
+  const client = requireClient();
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+  const { data: stale, error: e1 } = await client
+    .from('queue')
+    .select('user_id', { count: 'exact', head: true })
+    .eq('status', 'waiting')
+    .lt('last_seen_at', thirtyMinAgo);
+
+  const { data: orphaned, error: e2 } = await client
+    .from('queue')
+    .select('user_id, entered_at')
+    .eq('status', 'in_date');
+
+  const staleCount = (stale as unknown as { count: number } | null)?.count ?? 0;
+  const orphanedRows = (orphaned ?? []) as { user_id: string; entered_at: string }[];
+  const longestWait =
+    orphanedRows.length > 0
+      ? Math.max(...orphanedRows.map((r) => Date.now() - new Date(r.entered_at).getTime()))
+      : null;
+
+  return {
+    stale_entries: staleCount,
+    orphaned_in_date: e2 ? 0 : orphanedRows.length,
+    longest_wait_ms: longestWait,
+  };
+}
+
+// ─── USER RELATIONSHIPS ────────────────────────────────────────
+
+export type UserRelationshipItem = {
+  partner_id: string;
+  partner_name: string | null;
+  partner_avatar: string | null;
+  type: 'date' | 'block' | 'report_filed' | 'report_received';
+  outcome: string | null;
+  at: string;
+  detail: string | null;
+};
+
+export async function fetchUserRelationships(userId: string): Promise<{ items: UserRelationshipItem[] }> {
+  const client = requireClient();
+
+  const [dates, blocksGiven, reportsGiven, reportsReceived] = await Promise.all([
+    client
+      .from('dates')
+      .select('id, started_at, ended_at, status, user1_id, user2_id')
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .order('started_at', { ascending: false })
+      .limit(100),
+    client.from('user_blocks').select('blocked_id, created_at').eq('blocker_id', userId).limit(50),
+    client.from('moderation_reports').select('reported_user_id, report_reason, created_at, report_ops_status').eq('reporter_id', userId).limit(50),
+    client.from('moderation_reports').select('reporter_id, report_reason, created_at, report_ops_status').eq('reported_user_id', userId).limit(50),
+  ]);
+
+  const partnerIds = new Set<string>();
+  (dates.data ?? []).forEach((r: Record<string, unknown>) => {
+    const u1 = r['user1_id'] as string;
+    const u2 = r['user2_id'] as string;
+    partnerIds.add(u1 === userId ? u2 : u1);
+  });
+  (blocksGiven.data ?? []).forEach((r: Record<string, unknown>) => partnerIds.add(r['blocked_id'] as string));
+  (reportsGiven.data ?? []).forEach((r: Record<string, unknown>) => partnerIds.add(r['reported_user_id'] as string));
+  (reportsReceived.data ?? []).forEach((r: Record<string, unknown>) => partnerIds.add(r['reporter_id'] as string));
+
+  const { data: profiles } = await client
+    .from('profiles')
+    .select('id, name, avatar_url')
+    .in('id', [...partnerIds].slice(0, 100));
+
+  const profileMap: Record<string, { name: string | null; avatar_url: string | null }> = {};
+  for (const p of (profiles ?? []) as { id: string; name: string | null; avatar_url: string | null }[]) {
+    profileMap[p.id] = { name: p.name, avatar_url: p.avatar_url };
+  }
+
+  const items: UserRelationshipItem[] = [];
+
+  for (const r of (dates.data ?? []) as {
+    id: string;
+    started_at: string;
+    status: string | null;
+    user1_id: string;
+    user2_id: string;
+  }[]) {
+    const partnerId = r.user1_id === userId ? r.user2_id : r.user1_id;
+    items.push({
+      partner_id: partnerId,
+      partner_name: profileMap[partnerId]?.name ?? null,
+      partner_avatar: profileMap[partnerId]?.avatar_url ?? null,
+      type: 'date',
+      outcome: r.status,
+      at: r.started_at,
+      detail: null,
+    });
+  }
+  for (const r of (blocksGiven.data ?? []) as { blocked_id: string; created_at: string }[]) {
+    items.push({ partner_id: r.blocked_id, partner_name: profileMap[r.blocked_id]?.name ?? null, partner_avatar: profileMap[r.blocked_id]?.avatar_url ?? null, type: 'block', outcome: 'blocked', at: r.created_at, detail: 'You blocked this user' });
+  }
+  for (const r of (reportsGiven.data ?? []) as { reported_user_id: string; report_reason: string | null; created_at: string; report_ops_status: string | null }[]) {
+    items.push({ partner_id: r.reported_user_id, partner_name: profileMap[r.reported_user_id]?.name ?? null, partner_avatar: profileMap[r.reported_user_id]?.avatar_url ?? null, type: 'report_filed', outcome: r.report_ops_status, at: r.created_at, detail: r.report_reason });
+  }
+  for (const r of (reportsReceived.data ?? []) as { reporter_id: string; report_reason: string | null; created_at: string; report_ops_status: string | null }[]) {
+    items.push({ partner_id: r.reporter_id, partner_name: profileMap[r.reporter_id]?.name ?? null, partner_avatar: profileMap[r.reporter_id]?.avatar_url ?? null, type: 'report_received', outcome: r.report_ops_status, at: r.created_at, detail: r.report_reason });
+  }
+
+  items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return { items };
 }

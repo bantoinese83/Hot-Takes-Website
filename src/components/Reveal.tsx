@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useInView } from '../hooks/useInView';
+import { motion } from 'motion/react';
 
 interface RevealProps {
   children: ReactNode;
@@ -8,15 +8,15 @@ interface RevealProps {
 }
 
 export function Reveal({ children, className = '', delayMs = 0 }: RevealProps) {
-  const { ref, inView } = useInView<HTMLDivElement>();
-
   return (
-    <div
-      ref={ref}
-      className={`reveal ${inView ? 'reveal--visible' : ''} ${className}`.trim()}
-      style={{ transitionDelay: `${delayMs}ms` }}
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: "-50px" }}
+      transition={{ duration: 0.6, delay: delayMs / 1000, ease: "easeOut" }}
+      className={className}
     >
       {children}
-    </div>
+    </motion.div>
   );
 }

@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AdminPageShell } from '../components/AdminPageShell';
 import { AdminRefreshButton } from '../components/AdminRefreshButton';
 import { AdminErrorBanner } from '../components/AdminErrorBanner';
@@ -8,9 +9,26 @@ import { SimpleBarChart } from '../components/SimpleBarChart';
 import { useAdminAnalytics } from '../hooks/useAdminAnalytics';
 import { formatWaitMs } from '../../lib/adminApi';
 import { CHART_COLORS } from '../components/AdminChartTheme';
+import { supabase } from '../../lib/supabase';
 
 export function AnalyticsPage() {
   const { hub, error, degraded, loading, reload } = useAdminAnalytics(45_000);
+
+  useEffect(() => {
+    if (!supabase) return;
+
+    const channel = supabase
+      .channel('admin_analytics_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'queue' }, () => void reload(true))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'dates' }, () => void reload(true))
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'moderation_reports' }, () => void reload(true))
+      .subscribe();
+
+    return () => {
+      if (supabase) void supabase.removeChannel(channel);
+    };
+  }, [reload]);
+
   const o = hub?.overview;
   const wait = hub?.wait_time_24h;
   const ix = hub?.interactions;

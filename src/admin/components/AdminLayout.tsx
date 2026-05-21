@@ -1,8 +1,11 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   Activity,
+  Bell,
+  DollarSign,
   Flag,
   Globe,
+  HeartPulse,
   LayoutDashboard,
   LogOut,
   Brain,
@@ -10,13 +13,16 @@ import {
   Rocket,
   ScrollText,
   Settings,
+  ShieldAlert,
   TrendingUp,
   Users,
   Video,
+  Clapperboard,
 } from 'lucide-react';
 import { useAdminAuth } from '../../lib/useAdminAuth';
 import { AdminOpsProvider } from '../hooks/AdminOpsProvider';
 import { useAdminOps } from '../hooks/useAdminOps';
+import { AdminGlobalSearch } from './AdminGlobalSearch';
 import '../admin.css';
 
 type NavItem = {
@@ -41,13 +47,18 @@ const NAV_SECTIONS: NavSection[] = [
       { to: '/admin/geography', label: 'Geography', icon: Globe, badge: null },
       { to: '/admin/activity', label: 'Activity log', icon: ScrollText, badge: null },
       { to: '/admin/pairing', label: 'Pairing funnel', icon: Activity, badge: null },
+      { to: '/admin/dates', label: 'Date quality', icon: Clapperboard, badge: null },
+      { to: '/admin/health', label: 'System health', icon: HeartPulse, badge: null },
+      { to: '/admin/revenue', label: 'Revenue', icon: DollarSign, badge: null },
     ],
   },
   {
     title: 'Operations',
     items: [
       { to: '/admin/moderation', label: 'Moderation', icon: Flag, badge: 'reports' },
+      { to: '/admin/trust', label: 'Trust radar', icon: ShieldAlert, badge: null },
       { to: '/admin/queue', label: 'Live queue', icon: Video, badge: 'waiting' },
+      { to: '/admin/push', label: 'Push composer', icon: Bell, badge: null },
       { to: '/admin/users', label: 'Users', icon: Users, badge: null },
       { to: '/admin/growth', label: 'Waitlists', icon: Rocket, badge: null },
       { to: '/admin/community', label: 'Community votes', icon: MessageSquareQuote, badge: null },
@@ -87,6 +98,8 @@ function AdminLayoutInner() {
             <span className="admin-sidebar-brand-sub">Hot Take</span>
           </div>
         </div>
+
+        <AdminGlobalSearch />
 
         <div className="admin-sidebar-nav">
           {sections.map((section) => (

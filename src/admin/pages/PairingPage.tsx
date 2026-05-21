@@ -1,12 +1,16 @@
 import { AdminPageShell } from '../components/AdminPageShell';
 import { AdminRefreshButton } from '../components/AdminRefreshButton';
 import { AdminErrorBanner } from '../components/AdminErrorBanner';
+import { AdminStatCard } from '../components/AdminStatCard';
 import { DailyFunnelBarChart } from '../components/DailyFunnelBarChart';
 import { FunnelAreaChart } from '../components/FunnelAreaChart';
 import { useAdminAnalytics } from '../hooks/useAdminAnalytics';
+import { formatWaitMs } from '../../lib/adminApi';
 
 export function PairingPage() {
   const { hub, error, degraded, loading, reload } = useAdminAnalytics(45_000);
+
+  const wait = hub?.wait_time_24h;
 
   return (
     <AdminPageShell
@@ -19,6 +23,32 @@ export function PairingPage() {
           <p className="admin-loading">Loading funnel…</p>
         ) : (
           <>
+            <div className="admin-panel" style={{ marginBottom: '1.25rem' }}>
+              <div className="admin-panel-header">
+                <h2>Wait times (24h)</h2>
+              </div>
+              <div className="admin-stat-grid" style={{ padding: '1rem' }}>
+                <AdminStatCard 
+                  label="Average wait" 
+                  value={formatWaitMs(wait?.avg_ms)} 
+                />
+                <AdminStatCard 
+                  label="p50 (median)" 
+                  value={formatWaitMs(wait?.p50_ms)} 
+                  highlight={(wait?.p50_ms ?? 0) > 120_000}
+                />
+                <AdminStatCard 
+                  label="p90 (tail)" 
+                  value={formatWaitMs(wait?.p90_ms)} 
+                  highlight={(wait?.p90_ms ?? 0) > 300_000}
+                />
+                <AdminStatCard 
+                  label="p95 (max tail)" 
+                  value={formatWaitMs(wait?.p95_ms)} 
+                />
+              </div>
+            </div>
+
             <div className="admin-grid-2">
               <div className="admin-panel">
                 <div className="admin-panel-header">

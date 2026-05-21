@@ -42,8 +42,8 @@ export function useAdminAnalytics(refreshMs = 30_000) {
   const [degraded, setDegraded] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     setError(null);
     setDegraded(false);
     try {

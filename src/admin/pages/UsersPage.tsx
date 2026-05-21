@@ -26,6 +26,7 @@ export function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [searched, setSearched] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -33,20 +34,31 @@ export function UsersPage() {
   const [confirm, setConfirm] = useState<'queue' | 'tier' | 'delete' | null>(null);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
-  const loadProfiles = useCallback(async (searchQuery: string) => {
-    setLoading(true);
+  const PAGE_SIZE = 50;
+
+  const loadProfiles = useCallback(async (searchQuery: string, offset = 0) => {
+    if (offset === 0) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     setError(null);
     try {
-      const res = await searchProfiles(searchQuery, 100);
-      setProfiles(Array.isArray(res.profiles) ? res.profiles : []);
-      setTotal(typeof res.total === 'number' ? res.total : res.profiles?.length ?? 0);
+      const res = await searchProfiles(searchQuery, PAGE_SIZE, offset);
+      if (offset === 0) {
+        setProfiles(Array.isArray(res.profiles) ? res.profiles : []);
+      } else {
+        setProfiles((prev) => [...prev, ...res.profiles]);
+      }
+      setTotal(res.total);
       setSearched(true);
-      setSelected(new Set());
+      if (offset === 0) setSelected(new Set());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed');
-      setProfiles([]);
+      if (offset === 0) setProfiles([]);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
@@ -56,7 +68,12 @@ export function UsersPage() {
 
   const onSearch = async (e?: FormEvent) => {
     e?.preventDefault();
-    await loadProfiles(query);
+    await loadProfiles(query, 0);
+  };
+
+  const onLoadMore = async () => {
+    if (loading || loadingMore) return;
+    await loadProfiles(query, profiles.length);
   };
 
   const selectedIds = useMemo(() => Array.from(selected), [selected]);
@@ -249,7 +266,14 @@ export function UsersPage() {
                         onChange={() => toggleOne(p.id)}
                       />
                     </td>
-                    <td>
+                    <td style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {p.avatar_url ? (
+                        <img src={p.avatar_url} alt="" className="admin-avatar-sm" />
+                      ) : (
+                        <div className="admin-avatar-sm admin-avatar-sm--fallback">
+                          {(p.name || '?').charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <Link to={`/admin/users/${p.id}`} className="admin-link">
                         {p.name ?? 'Unnamed'}
                       </Link>
@@ -273,6 +297,19 @@ export function UsersPage() {
           </div>
         )}
       </div>
+
+      {total !== null && profiles.length < total && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: '1rem' }}>
+          <button
+            type="button"
+            className="admin-btn admin-btn--ghost"
+            disabled={loadingMore}
+            onClick={() => void onLoadMore()}
+          >
+            {loadingMore ? 'Loading more…' : `Load more (${total - profiles.length} remaining)`}
+          </button>
+        </div>
+      )}
 
       <AdminConfirmDialog
         open={confirm === 'queue'}

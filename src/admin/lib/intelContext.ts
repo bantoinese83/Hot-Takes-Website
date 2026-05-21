@@ -5,6 +5,7 @@ import {
   fetchModerationReports,
   fetchQueueSnapshot,
   fetchAllCommunityPrompts,
+  fetchPairingWeights,
   type AdminAnalyticsHub,
 } from '../../lib/adminApi';
 
@@ -24,6 +25,7 @@ export type IntelContextBundle = {
   growth?: unknown;
   geography?: unknown;
   community?: unknown;
+  pairing_weights?: unknown;
 };
 
 export async function loadIntelContext(scope: IntelContextScope): Promise<string> {
@@ -31,7 +33,12 @@ export async function loadIntelContext(scope: IntelContextScope): Promise<string
 
   try {
     if (scope === 'full' || scope === 'ops' || scope === 'growth') {
-      bundle.analytics = await fetchAdminAnalyticsHub();
+      const [hub, weights] = await Promise.all([
+        fetchAdminAnalyticsHub(),
+        fetchPairingWeights(),
+      ]);
+      bundle.analytics = hub;
+      bundle.pairing_weights = weights;
     }
     if (scope === 'full' || scope === 'moderation') {
       const mod = await fetchModerationReports(40, 0, 'open');
@@ -92,4 +99,4 @@ export async function loadIntelContext(scope: IntelContextScope): Promise<string
   return trimJson(bundle);
 }
 
-export type IntelContextScope = 'full' | 'ops' | 'moderation' | 'queue' | 'growth' | 'geo' | 'community';
+export type IntelContextScope = 'full' | 'ops' | 'moderation' | 'queue' | 'growth' | 'geo' | 'community' | 'user';
