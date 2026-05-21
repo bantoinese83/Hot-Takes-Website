@@ -319,9 +319,9 @@ export function CommunityPage() {
                         <tr key={p.slug} className={p.is_active === false ? 'admin-row-muted' : undefined}>
                           <td>{p.is_active === false ? 'No' : 'Yes'}</td>
                           <td className="admin-mono">
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                            <div title={isChampion ? "Champion" : undefined} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                               {isChampion && (
-                                <Award size={13} style={{ color: '#fbbf24', flexShrink: 0 }} title="Champion" />
+                                <Award size={13} style={{ color: '#fbbf24', flexShrink: 0 }} />
                               )}
                               {p.slug}
                             </div>

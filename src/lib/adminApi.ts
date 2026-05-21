@@ -1067,9 +1067,9 @@ export async function fetchQueueHealthCheck(): Promise<{
   const client = requireClient();
   const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
 
-  const { data: stale, error: e1 } = await client
+  const { count: staleCount } = await client
     .from('queue')
-    .select('user_id', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .eq('status', 'waiting')
     .lt('last_seen_at', thirtyMinAgo);
 
@@ -1078,7 +1078,7 @@ export async function fetchQueueHealthCheck(): Promise<{
     .select('user_id, entered_at')
     .eq('status', 'in_date');
 
-  const staleCount = (stale as unknown as { count: number } | null)?.count ?? 0;
+  const staleCountResolved = staleCount ?? 0;
   const orphanedRows = (orphaned ?? []) as { user_id: string; entered_at: string }[];
   const longestWait =
     orphanedRows.length > 0
@@ -1086,7 +1086,7 @@ export async function fetchQueueHealthCheck(): Promise<{
       : null;
 
   return {
-    stale_entries: staleCount,
+    stale_entries: staleCountResolved,
     orphaned_in_date: e2 ? 0 : orphanedRows.length,
     longest_wait_ms: longestWait,
   };

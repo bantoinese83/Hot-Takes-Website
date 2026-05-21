@@ -11,7 +11,7 @@ import {
   type PushHistoryRow,
   type SendPushInput,
 } from '../../lib/adminApi';
-import { formatDateTime, formatRelativeTime } from '../lib/adminFormat';
+import { formatRelativeTime } from '../lib/adminFormat';
 
 type PushTarget = SendPushInput['target'];
 
