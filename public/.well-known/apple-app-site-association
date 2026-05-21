@@ -1,0 +1,20 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["93X5P98M48.com.hottakes.app"],
+        "components": [
+          {
+            "/": "/join",
+            "comment": "Referral invite landing — opens Hot Take app when installed"
+          },
+          {
+            "/": "/join/*",
+            "comment": "e.g. /join?ref=AB12CD34"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -19,6 +19,28 @@ Built with React, TypeScript, and Vite.
 - Vite
 - `lucide-react` for icons
 
+## Community Hot/Cold votes (live)
+
+The interactive previewer reads and writes votes through the same Supabase project as the iOS app.
+
+1. Copy `.env.example` to `.env.local`
+2. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (anon key from Supabase → Project Settings → API)
+3. Apply migration `20260518190000_community_take_votes.sql` on that project (`supabase db push` from the mobile repo)
+
+Without env vars, the site falls back to static demo percentages.
+
+## Admin dashboard (`/admin`)
+
+Ops console for the same Supabase project (migration `20260523120000_website_admin_dashboard.sql` in the **hot-takes-dating-app** repo).
+
+1. Allowlisted emails live in `public.website_admins` (default superadmin: `b.antoine.se@gmail.com`).
+2. Create a Supabase Auth user with that email (or sign up in the iOS app first).
+3. Open [http://localhost:5173/admin/login](http://localhost:5173/admin/login) and sign in with email + password.
+
+**Sections:** Overview KPIs, moderation reports, live queue, pairing funnel (24h), profile search, community vote stats.
+
+Access is enforced server-side via `admin_*` RPCs (`admin_require_access`); the browser never uses the service role key.
+
 ## Getting Started
 
 ### 1) Install dependencies

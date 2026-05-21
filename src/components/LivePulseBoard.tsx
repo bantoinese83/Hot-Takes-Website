@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Flame, Radio, Users, Video, Zap } from 'lucide-react';
+import { BorderBeam } from '@/components/magicui/border-beam';
+import { NumberTicker } from '@/components/magicui/number-ticker';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber';
 import { DEMO_PULSE, subscribeLivePulse, type LivePulseStats } from '../lib/livePulse';
 import { isSupabaseConfigured } from '../lib/supabase';
@@ -17,14 +19,14 @@ function PulseStat({
   icon: typeof Video;
   accent?: boolean;
 }) {
-  const display = useAnimatedNumber(value);
-
   return (
     <div className={`pulse-stat ${accent ? 'pulse-stat--accent' : ''}`}>
       <span className="pulse-stat-icon" aria-hidden>
         <Icon size={18} strokeWidth={2.25} />
       </span>
-      <span className="pulse-stat-value">{display.toLocaleString()}</span>
+      <span className="pulse-stat-value">
+        <NumberTicker value={value} className="!text-inherit" />
+      </span>
       <span className="pulse-stat-label">{label}</span>
     </div>
   );
@@ -75,7 +77,8 @@ export function LivePulseBoard() {
     <section className="live-pulse-section" id="live" aria-labelledby="live-pulse-heading">
       <div className="container">
         <Reveal>
-          <div className="live-pulse-board glass-card">
+          <div className="live-pulse-board glass-card relative overflow-hidden">
+            <BorderBeam size={80} duration={8} colorFrom="#ff544e" colorTo="#83cfff" borderWidth={1} />
             <div className="live-pulse-header">
               <span className="live-pulse-badge">
                 <span className="live-pulse-dot" />

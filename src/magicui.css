@@ -1,0 +1,66 @@
+@import 'tailwindcss';
+
+@theme {
+  --animate-marquee: marquee var(--duration, 40s) linear infinite;
+  --animate-marquee-vertical: marquee-vertical var(--duration, 40s) linear infinite;
+  --animate-gradient: gradient 8s linear infinite;
+  --animate-shine: shine var(--duration, 14s) infinite linear;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap, 1rem)));
+  }
+}
+
+@keyframes gradient {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes shine {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+/* Scoped: Magic UI only affects marketing sections */
+.marketing-magic {
+  @layer components {
+    .animate-marquee {
+      animation: marquee var(--duration, 40s) linear infinite;
+    }
+    .animate-marquee-vertical {
+      animation: marquee-vertical var(--duration, 40s) linear infinite;
+    }
+    .animate-gradient {
+      animation: gradient 8s linear infinite;
+    }
+    .animate-shine {
+      animation: shine var(--duration, 14s) infinite linear;
+    }
+  }
+}

@@ -9,6 +9,7 @@ import {
 } from '../lib/communityTakes';
 import { applyLocalVoteShift } from '../lib/voteLocal';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { ShineBorder } from '@/components/magicui/shine-border';
 import { useAnimatedPercent } from '../hooks/useAnimatedPercent';
 import { Reveal } from './Reveal';
 
@@ -201,7 +202,8 @@ export function CommunityVotePanel() {
 
         <Reveal delayMs={140}>
           <div className="previewer-card-container">
-            <article key={cardKey} className="previewer-card glass-card previewer-card--enter">
+            <article key={cardKey} className="previewer-card glass-card previewer-card--enter relative overflow-hidden">
+              <ShineBorder shineColor="#ff544e" duration={12} borderWidth={1} />
               <span className="previewer-category">{activeHotTake.category}</span>
               <p className="previewer-hottake">&ldquo;{activeHotTake.question}&rdquo;</p>
 
